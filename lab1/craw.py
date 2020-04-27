@@ -81,14 +81,11 @@ class Craw:
                 err_num += 1
         return out_lst
 
-    def output_res(self, craw_lst: list):  # 以json格式输出爬取的结果到文件中
-        res = []
-        for item in craw_lst:  # 构造输出的json格式列表
-            res.append(json.dumps(item, ensure_ascii=False))
+    def output_res(self, craw_lst: list) -> list:  # 以json格式输出爬取的结果到文件中
+        res = [json.dumps(item, ensure_ascii=False) for item in craw_lst]  # 构造输出的json格式列表
         with open(self.craw_res_file, 'w', encoding='utf-8') as f:
             f.write('\n'.join(res))
-        with open('./output/preprocessed.json', 'w', encoding='utf-8') as f:
-            f.write('\n'.join(res[:10]))
+        return res
 
 
 def process_img_url(img_url: str) -> str:

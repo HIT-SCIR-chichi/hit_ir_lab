@@ -5,6 +5,9 @@
   "url_num": 1000,
   "url_with_file": 100,
   "craw_res_file": "./output/craw_res.json",
+  "seg_res_file": "./output/seg_res.json",
   "output_file": "./output/preprocessed.json",
-  "output_num": 10
+  "output_num": 10,
+  "cws_model_path": "E:/pyltp/ltp_data_v3.4.0/cws.model",
+  "stop_words": "./input/stopwords.txt"
 }
