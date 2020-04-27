@@ -1,0 +1,10 @@
+{
+  "start_urls": [
+    "https://news.163.com/"
+  ],
+  "url_num": 1000,
+  "url_with_file": 100,
+  "craw_res_file": "./output/craw_res.json",
+  "output_file": "./output/preprocessed.json",
+  "output_num": 10
+}
