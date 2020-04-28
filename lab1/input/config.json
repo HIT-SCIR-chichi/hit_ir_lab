@@ -1,6 +1,10 @@
 {
-  "start_urls": [
-    "https://news.163.com/"
+  "start_url": "https://news.163.com/rank/",
+  "legal_urls": [
+    "news.163.com",
+    "ent.163.com",
+    "gov.163.com",
+    "tech.163.com"
   ],
   "url_num": 1000,
   "url_with_file": 100,

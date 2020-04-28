@@ -5,6 +5,7 @@
 将爬取的网页文本进行分词和去停用词处理，并将结果保存.
 """
 import json
+import time
 
 
 class Segment:
@@ -30,7 +31,6 @@ class Segment:
                 para_lst = [word for word in seg.segment(craw['paragraphs']) if word not in stop_words]
                 res.append({'url': craw['url'], 'segmented_title': title_lst, 'segmented_paragraphs': para_lst,
                             'file_name': craw['file_name']})
-            print('分词和去停用词处理完成')
             seg.release()
             return res
 
@@ -44,4 +44,7 @@ class Segment:
 
 if __name__ == '__main__':
     segment = Segment()
+    print('*' * 100 + '\n开始进行分词和停用词处理...')
+    time0 = time.time()
     segment.output_res(segment.process_craw_res())  # 将分词结果输出到配置文件中规定的seg_res_file和output_file文件中
+    print('处理完成，用时：' + str(time.time() - time0) + '秒\n' + '*' * 100)
