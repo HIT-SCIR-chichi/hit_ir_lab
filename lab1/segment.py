@@ -9,7 +9,15 @@ import time
 
 
 def process(stop_words='stopwords.txt', craw_file='./output/craw_res.json',
-            model_path='E:/pyltp/ltp_data_v3.4.0/cws.model'):
+            model_path='E:/pyltp/ltp_data_v3.4.0/cws.model') -> list:
+    """
+    将craw.py文件输出的结果进行分词和停用词处理.
+
+    :param stop_words: 停用词文件.
+    :param craw_file: craw.py文件输出的json结果文件.
+    :param model_path: pyltp加载的模型文件路径.
+    :return: list，返回处理结果列表
+    """
     with open(stop_words, 'r', encoding='utf-8') as f, open(craw_file, 'r', encoding='utf-8') as f1:
         stop_words = set(f.read().split('\n'))  # 获取停用词
 

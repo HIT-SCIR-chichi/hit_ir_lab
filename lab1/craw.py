@@ -22,6 +22,12 @@ rps, craw_delay = [], 0  # 礼貌规则集合，爬取时间间隔
 
 
 def get_urls(k=1.2):
+    """
+    从start_url开始，通过超链接的形式拓展爬取url，爬取的url形式满足legal_urls参数中的一个形式.
+
+    :param k: 拓展因子，由于爬取的网页存在非法网页或者不带有附件的网页，所以需要设置k>1，确保爬取的数目不会小于num=1000.
+    :return: url2visit，待爬取的网页列表.
+    """
     url2visit = [start_url]  # 将要访问的URL队列
     for url in url2visit:
         print('抓取进度：%.2f%%' % (float(len(url2visit)) / (num * 1.2) * 100))
@@ -41,6 +47,13 @@ def get_urls(k=1.2):
 
 
 def craw_url(url, img_dir='./output/img/'):
+    """
+    爬取单个网页，并将附件输出到output/img文件夹中.
+
+    :param url: 待爬取的url.
+    :param img_dir: 输出的图片所在的文件夹.
+    """
+
     def process_img_url(url_of_img: str) -> str:
         symbols = {'&', '!', '?'}
         for idx, char in enumerate(url_of_img):
@@ -104,7 +117,7 @@ def output(craw_file='./output/craw_res.json') -> list:  # 以json格式输出�
     return res
 
 
-class MyThread(Thread):
+class MyThread(Thread):  # 多线程爬取网页，采用线程安全的Queue储存url
     def run(self) -> None:
         while True:
             try:
