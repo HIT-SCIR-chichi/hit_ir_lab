@@ -1,8 +1,16 @@
 from pyltp import Segmentor
+from os.path import exists
 import json
 
+train_path, test_path = './data/train.json', './data/test.json'
+train_question_path, test_question_path = './data/train_questions.txt', './data/test_questions.txt'
+lr_model_path, tf_idf_path = './question_classification/lr_model', './question_classification/tf_idf'
 cws_model_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model'  # pyltp模型文件路径
 seg = None
+
+
+def file_exists(path):
+    return exists(path)
 
 
 def seg_line(line: str) -> list:
