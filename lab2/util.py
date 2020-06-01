@@ -1,12 +1,13 @@
-from pyltp import Segmentor
+from pyltp import Segmentor, Postagger
 from os.path import exists
 import json
 
+passages_path = './data/passages_multi_sentences.json'
 train_path, test_path = './data/train.json', './data/test.json'
 train_question_path, test_question_path = './data/train_questions.txt', './data/test_questions.txt'
 lr_model_path, tf_idf_path = './question_classification/lr_model', './question_classification/tf_idf'
-cws_model_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model'  # pyltp模型文件路径
-seg = None
+cws_path, pos_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model', 'E:/pyltp/ltp_data_v3.4.0/pos.model'
+seg, postagger = None, None
 
 
 def file_exists(path):
@@ -17,8 +18,16 @@ def seg_line(line: str) -> list:
     global seg
     if not seg:
         seg = Segmentor()
-        seg.load(cws_model_path)  # 加载模型
+        seg.load(cws_path)  # 加载模型
     return list(seg.segment(line))
+
+
+def pos_tag(words: list) -> list:  # 词性标注
+    global postagger
+    if not postagger:
+        postagger = Postagger()
+        postagger.load(pos_path)  # 加载模型
+    return list(postagger.postag(words))
 
 
 def read_json(json_path):  # 读取json文件，要求每一行都是标准的json格式文件，返回：list[python对象]

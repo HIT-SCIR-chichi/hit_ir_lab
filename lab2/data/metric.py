@@ -11,8 +11,9 @@
 2. EM（exact match）值：精确匹配的准确率
 3. 字符级别的bleu1值
 """
-
+from nltk.translate.bleu_score import sentence_bleu
 from collections import Counter
+
 
 def precision_recall_f1(prediction, ground_truth):
     """
@@ -28,13 +29,13 @@ def precision_recall_f1(prediction, ground_truth):
     >>> precision_recall_f1(prediction, ground_truth)
     >>> (0.6, 1.0, 0.7499999999999999)
     """
-#     # 对于中文字符串，需要在每个字之间加空格
-#     prediction = " ".join(prediction)
-#     ground_truth = " ".join(ground_truth)
+    #     # 对于中文字符串，需要在每个字之间加空格
+    #     prediction = " ".join(prediction)
+    #     ground_truth = " ".join(ground_truth)
 
-#     prediction_tokens = prediction.split()
-#     ground_truth_tokens = ground_truth.split()
-    
+    #     prediction_tokens = prediction.split()
+    #     ground_truth_tokens = ground_truth.split()
+
     common = Counter(prediction) & Counter(ground_truth)
     num_same = sum(common.values())
     if num_same == 0:
@@ -66,8 +67,9 @@ def exact_match(all_prediction, all_ground_truth):
             right_count += 1
     return 1.0 * right_count / len(all_ground_truth)
 
+
 def bleu1(prediction, ground_truth):
-    '''
+    """
     计算单个预测答案prediction和单个真实答案ground_truth之间的字符级别的bleu1值,(可能会有warning， 不用管)
     Args:
         prediction: 预测答案（未分词的字符串）
@@ -79,8 +81,12 @@ def bleu1(prediction, ground_truth):
     >>> ground_truth = '天安门'
     >>> bleu1(prediction, ground_truth)
     >>> 0.6
-    '''
+    """
     prediction = ' '.join(prediction).split()
     ground_truth = [' '.join(ground_truth).split()]
     bleu1 = sentence_bleu(ground_truth, prediction, weights=(1, 0, 0, 0))
     return bleu1
+
+
+if __name__ == '__main__':
+    bleu1('北京天安门', '天安门')

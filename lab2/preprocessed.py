@@ -5,14 +5,11 @@
 # todo 去停用词处理
 # todo 现在计算tf与idf的log底数为10
 # todo 现在计算相似度的查询权重为1
-from util import load, dump, read_json, write_json, seg_line
+from util import load, dump, read_json, write_json, seg_line, passages_path, train_path
 from math import pow, log
 import os
 
-vsm_model_path = './preprocessed/vsm.json'  # VSM模型的权重路径
-passages_path = './data/passages_multi_sentences.json'
-train_path = './data/train.json'  # 训练集文本
-train_preprocess_path = './preprocessed/train_preprocessed.json'  # 训练集初步分词的结果
+model_path, preprocess_path = './preprocessed/vsm.json', './preprocessed/train_preprocessed.json'
 weight = {}  # VSM模型权重矩阵，形式如：{pid: {word: weight}}
 
 
@@ -25,9 +22,9 @@ def seg_document(res_lst):  # 使用LTP进行分词操作，返回{pid:[[],[]]}
 
 def vsm_init():  # 从JSON文件中加载权重矩阵；若文件不存在，则重新初始化矩阵，并写入JSON文件，
     global weight
-    if os.path.exists(vsm_model_path):
+    if os.path.exists(model_path):
         print('正在加载VSM模型...')
-        weight = load(vsm_model_path)
+        weight = load(model_path)
     else:
         print('正在创建VSM模型...')
         res_dic, words = seg_document(read_json(passages_path)), {}  # 词表，保存所有的词语，形式如：{word: log(N/df)]}
@@ -47,7 +44,7 @@ def vsm_init():  # 从JSON文件中加载权重矩阵；若文件不存在，则
             for word, tf in weight[pid].items():  # 遍历每一个词项
                 weight[pid][word] = (1 + log(tf, 10)) * words[word]
         print('导出VSM模型...')
-        dump(vsm_model_path, weight)
+        dump(model_path, weight)
 
 
 def calc_inner_product(query_dic: dict):  # {word: weight}weight默认为1，返回值形如[(pid, similarity), ()]
@@ -85,16 +82,16 @@ def calc_vsm_perform(similarity_func):
     if similarity_func.__name__ not in [calc_cosine.__name__, calc_inner_product.__name__, calc_jaccard.__name__]:
         print('错误的输入相似度计算函数...')
         return
-    if os.path.exists(train_preprocess_path):
+    if os.path.exists(preprocess_path):
         print('正在加载训练集的预处理文件...')
-        res_lst = read_json(train_preprocess_path)  # 加载训练集初步处理后的文件
+        res_lst = read_json(preprocess_path)  # 加载训练集初步处理后的文件
     else:
         print('正在预处理训练及文件...')
         res_lst = read_json(train_path)  # 加载训练集源文件
         for question in res_lst:
             question['question'] = seg_line(question['question'])
         print('分词结束，开始导出训练集的与处理文件...')
-        write_json(train_preprocess_path, res_lst)
+        write_json(preprocess_path, res_lst)
 
     print('正在计算相似度...')
     res = {}
