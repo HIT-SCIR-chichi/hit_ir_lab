@@ -1,17 +1,15 @@
 """
 候选答案句排序.
 """
-# todo 去停用词
-from util import read_json, seg_line, pos_tag, passages_path, train_path, dump, file_exists, load
+# todo 去停用词；根据query类型进一步筛选排序后的结果，比如是否含有时间名词、地点名词、人物名词
+from util import read_json, seg_line, pos_tag, train_path, file_exists, load_seg_passages
 from sklearn.feature_extraction.text import TfidfVectorizer
 from distance import levenshtein as edit_dist
 from scipy.linalg import norm
 from numpy import dot
 
-seg_passages_path = './answer_sentence_selection/seg_passages.json'
 train_feature_path, test_feature_path = './answer_sentence_selection/train', './answer_sentence_selection/test'
-model_path = './answer_sentence_selection/model'
-predict_path = './answer_sentence_selection/predictions'
+model_path, predict_path = './answer_sentence_selection/model', './answer_sentence_selection/predictions'
 
 
 def lc_subsequence(s1, s2):
@@ -68,15 +66,7 @@ def load_train_dev(dev=0.1, update=False):  # 生成训练集和验证集，并�
     if file_exists(train_feature_path) and file_exists(test_feature_path) and not update:
         return
     else:
-        if file_exists(seg_passages_path):
-            seg_passages = load(seg_passages_path)
-        else:
-            seg_passages = {}
-            for item in read_json(passages_path):
-                seg_passages[item['pid']] = [seg_line(line.replace(' ', '')) for line in item['document']]
-            dump(seg_passages_path, seg_passages)  # 将分词后的文本集导出到文件中
-
-        res_lst, feature_lst = read_json(train_path), []
+        seg_passages, res_lst, feature_lst = read_json(train_path), [], load_seg_passages()
         for item in res_lst:  # 遍历train.json文件中的每一行query信息
             qid, pid, q_words, ans_words_lst, features = item['qid'], item['pid'], seg_line(item['question']), \
                                                          [seg_line(line) for line in item['answer_sentence']], []
@@ -108,7 +98,7 @@ def exe_rank_svm():  # 调用svm-rank可执行文件，训练并预测模型
     system('%s && %s' % (train_cmd, predict_cmd))
 
 
-def evaluate(n=1):
+def evaluate():
     with open(test_feature_path, 'r', encoding='utf-8') as f1, open(predict_path, 'r', encoding='utf-8') as f2:
         y_true, y_predict, right = {}, {}, 0
         for line1, line2 in zip(f1, f2):

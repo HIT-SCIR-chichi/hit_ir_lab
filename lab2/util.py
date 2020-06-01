@@ -2,10 +2,9 @@ from pyltp import Segmentor, Postagger
 from os.path import exists
 import json
 
-passages_path = './data/passages_multi_sentences.json'
 train_path, test_path = './data/train.json', './data/test.json'
+passages_path, seg_passages_path = './data/passages_multi_sentences.json', './data/seg_passages.json'
 train_question_path, test_question_path = './data/train_questions.txt', './data/test_questions.txt'
-lr_model_path, tf_idf_path = './question_classification/lr_model', './question_classification/tf_idf'
 cws_path, pos_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model', 'E:/pyltp/ltp_data_v3.4.0/pos.model'
 seg, postagger = None, None
 
@@ -48,3 +47,14 @@ def load(json_path):  # 读取JSON文件，获取python数据结构
 def dump(json_path, obj):  # 导出python对象到JSON文件中
     with open(json_path, 'w', encoding='utf-8') as f:
         json.dump(obj, f, ensure_ascii=False)
+
+
+def load_seg_passages():  # 加载分词后的passages
+    if exists(seg_passages_path):
+        seg_passages = load(seg_passages_path)
+    else:
+        seg_passages = {}
+        for item in read_json(passages_path):
+            seg_passages[item['pid']] = [seg_line(line.replace(' ', '')) for line in item['document']]
+        dump(seg_passages_path, seg_passages)  # 将分词后的文本集导出到文件中
+    return seg_passages
