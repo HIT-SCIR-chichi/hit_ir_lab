@@ -2,14 +2,18 @@
 候选答案句排序.
 """
 # todo 去停用词；根据query类型进一步筛选排序后的结果，比如是否含有时间名词、地点名词、人物名词
-from util import read_json, seg_line, pos_tag, train_path, file_exists, load_seg_passages
+from util import read_json, seg_line, pos_tag, train_path, file_exists, load_seg_passages, write_json
+from question_classification import test_label_path as test_path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from distance import levenshtein as edit_dist
 from scipy.linalg import norm
 from numpy import dot
+from os import system
 
-train_feature_path, test_feature_path = './answer_sentence_selection/train', './answer_sentence_selection/test'
-model_path, predict_path = './answer_sentence_selection/model', './answer_sentence_selection/predictions'
+train_feature_path, dev_feature_path = './answer_sentence_selection/train', './answer_sentence_selection/dev'
+model_path, dev_predict_path = './answer_sentence_selection/model', './answer_sentence_selection/dev_predictions'
+test_feature_path, test_predict_path = './answer_sentence_selection/test', 'answer_sentence_selection/test_predictions'
+test_ans_path = './answer_sentence_selection/test_predict.json'  # 最终测试集输出的结果文本
 
 
 def lc_subsequence(s1, s2):
@@ -63,10 +67,10 @@ def get_features(q_words: list, ans_words: list, tf_idf_vec):  # q_words为查�
 
 
 def load_train_dev(dev=0.1, update=False):  # 生成训练集和验证集，并将其按照rank-svm数据格式要求写入到文件中
-    if file_exists(train_feature_path) and file_exists(test_feature_path) and not update:
+    if file_exists(train_feature_path) and file_exists(dev_feature_path) and not update:
         return
     else:
-        seg_passages, res_lst, feature_lst = read_json(train_path), [], load_seg_passages()
+        seg_passages, res_lst, feature_lst = load_seg_passages(), read_json(train_path), []
         for item in res_lst:  # 遍历train.json文件中的每一行query信息
             qid, pid, q_words, ans_words_lst, features = item['qid'], item['pid'], seg_line(item['question']), \
                                                          [seg_line(line) for line in item['answer_sentence']], []
@@ -84,7 +88,7 @@ def load_train_dev(dev=0.1, update=False):  # 生成训练集和验证集，并�
         train_features, test_features = feature_lst[:-dev_num], feature_lst[-dev_num:]
 
         # 导出训练集和测试集
-        with open(train_feature_path, 'w', encoding='utf-8') as f1, open(test_feature_path, 'w',
+        with open(train_feature_path, 'w', encoding='utf-8') as f1, open(dev_feature_path, 'w',
                                                                          encoding='utf-8') as f2:
             f1.write('\n'.join([feature for feature_lst in train_features for feature in feature_lst]))
             f2.write('\n'.join([feature for feature_lst in test_features for feature in feature_lst]))
@@ -92,14 +96,13 @@ def load_train_dev(dev=0.1, update=False):  # 生成训练集和验证集，并�
 
 
 def exe_rank_svm():  # 调用svm-rank可执行文件，训练并预测模型
-    from os import system
     train_cmd = '.\svm_rank_windows\svm_rank_learn.exe -c 10 %s %s' % (train_feature_path, model_path)
-    predict_cmd = '.\svm_rank_windows\svm_rank_classify.exe %s %s %s' % (test_feature_path, model_path, predict_path)
+    predict_cmd = '.\svm_rank_windows\svm_rank_classify.exe %s %s %s' % (dev_feature_path, model_path, dev_predict_path)
     system('%s && %s' % (train_cmd, predict_cmd))
 
 
 def evaluate():
-    with open(test_feature_path, 'r', encoding='utf-8') as f1, open(predict_path, 'r', encoding='utf-8') as f2:
+    with open(dev_feature_path, 'r', encoding='utf-8') as f1, open(dev_predict_path, 'r', encoding='utf-8') as f2:
         y_true, y_predict, right = {}, {}, 0
         for line1, line2 in zip(f1, f2):
             if len(line1) == 1:
@@ -118,16 +121,66 @@ def evaluate():
         return right, len(y_true)
 
 
+def load_test_data(update=False):
+    if file_exists(test_feature_path) and not update:
+        pass
+    else:
+        seg_passages, res_lst, feature_lst = load_seg_passages(), read_json(test_path), []
+        for item in res_lst:  # 遍历文件中的每一行query信息
+            qid, pid, q_words, features = item['qid'], item['pid'], item['question'], []
+            tf_idf_vec = TfidfVectorizer(token_pattern=r"(?u)\b\w+\b")
+            tf_idf_vec.fit_transform(' '.join(word_lst) for word_lst in seg_passages[str(pid)])
+
+            for word_lst in seg_passages[str(pid)]:
+                feature = ' '.join(get_features(q_words, word_lst, tf_idf_vec))
+                features.append('0 qid:%d %s' % (qid, feature))
+            feature_lst.append(features)
+        feature_lst.sort(key=lambda lst: int(lst[0].split()[1].split(':')[1]))  # 按照qid排序
+        with open(test_feature_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join([feature for features in feature_lst for feature in features]))
+
+
+def load_model(update=False):
+    if file_exists(model_path) and not update:
+        return
+    else:
+        print('*' * 100 + '\n正在构造训练集和开发集特征文件...')
+        load_train_dev(update=update)
+        print('构造训练集和开发集特征文件完成...\n' + '*' * 100 + '\n开始训练svm-rank模型并对验证集进行预测...')
+        exe_rank_svm()
+        print('预测完成\n' + '*' * 100)
+        right_predict, num = evaluate()
+        print('验证集正确答案数目：{}；总数：{}；正确率：{}'.format(right_predict, num, right_predict / num))
+
+
+def predict(num=1):  # num表示抽取的答案句数目
+    system('.\svm_rank_windows\svm_rank_classify.exe %s %s %s' % (test_feature_path, model_path, test_predict_path))
+    with open(test_feature_path, 'r', encoding='utf-8') as f1, open(test_predict_path, 'r', encoding='utf-8') as f2:
+        labels = {}
+        for line1, line2 in zip(f1, f2):
+            if len(line1) == 1:
+                break
+            qid = int(line1.split()[1].split(':')[1])
+            if qid not in labels:
+                labels[qid] = []
+            labels[qid].append((float(line2.strip()), len(labels[qid])))
+        seg_passages, res_lst = load_seg_passages(), read_json(test_path)
+        for item in res_lst:  # 遍历文件中的每一行query信息
+            qid, pid, q_words = item['qid'], item['pid'], item['question']
+            rank_lst, seg_passage = sorted(labels[qid], key=lambda val: val[0], reverse=True), seg_passages[str(pid)]
+            item['answer_sentence'] = [seg_passage[rank[1]] for rank in rank_lst[:num]]  # 抽取答案句
+        write_json(test_ans_path, res_lst)
+
+
 def main():
-    print('*' * 100 + '\n正在构造训练集和开发集特征文件...')
-    load_train_dev(update=False)
-    print('构造训练集和开发集特征文件完成...')
-    print('*' * 100 + '\n开始训练svm-rank模型并对验证集进行预测...')
-    exe_rank_svm()
-    print('预测完成\n' + '*' * 100)
-    right_predict, num = evaluate()
-    print('验证集正确答案数目：{}；总数：{}；正确率：{}'.format(right_predict, num, right_predict / num))
+    print('*' * 100 + '\n正在构造测试集特征文本...')
+    load_test_data(update=False)
+    print('构造测试集特征文件完成...\n' + '*' * 100 + '\n正在加载模型...')
+    load_model(update=False)
+    print('模型加载完毕...\n' + '*' * 100 + '\n正在对测试集进行预测...')
+    predict(num=3)
+    print('预测结束...\n' + '*' * 100)
 
 
 if __name__ == '__main__':
-    main()
+    main()  # 对测试集执行预测分析

@@ -58,7 +58,7 @@ def main():
     print('*' * 100 + '\n正在对测试集进行问题类别预测...')
     json_lst = read_json(test_predict_path)  # 对测试集的问题进行类别预测
     x_data = [' '.join(item['question']) for item in json_lst]
-    y_data = lr.predict(tf_idf_vec.transform(x_data))
+    y_data = lr.main(tf_idf_vec.transform(x_data))
     for item, label in zip(json_lst, y_data):
         item['label'] = label
     write_json(test_label_path, json_lst)
