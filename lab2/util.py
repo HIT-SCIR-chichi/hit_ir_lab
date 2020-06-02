@@ -6,6 +6,7 @@ train_path, test_path = './data/train.json', './data/test.json'
 passages_path, seg_passages_path = './data/passages_multi_sentences.json', './data/seg_passages.json'
 train_question_path, test_question_path = './data/train_questions.txt', './data/test_questions.txt'
 cws_path, pos_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model', 'E:/pyltp/ltp_data_v3.4.0/pos.model'
+test_answer_path = './data/test_answer.json'
 seg, postagger = None, None
 
 
