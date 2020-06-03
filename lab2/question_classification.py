@@ -47,6 +47,17 @@ def lr_init(x_train, y_train):  # solver选用默认的lbfgs, multi_class选用�
         return grid_search.best_estimator_
 
 
+def get_train_labels():  # 将train.json文件中的所有问题分类
+    tf_idf_vec = joblib.load(tf_idf_path)
+    lr = joblib.load(lr_model_path)
+    res_lst = read_json('./preprocessed/train_preprocessed.json')
+    x_data = [' '.join(item['question']) for item in res_lst]
+    y_data = lr.predict(tf_idf_vec.transform(x_data))
+    for item, label in zip(res_lst, y_data):
+        item['label'] = label
+    write_json('./temp.json', res_lst)
+
+
 def main():
     print('*' * 100 + '\n正在加载VSM模型和LR逻辑回归模型...')
     x_train, y_train, x_test, y_test = load_data()
@@ -58,7 +69,7 @@ def main():
     print('*' * 100 + '\n正在对测试集进行问题类别预测...')
     json_lst = read_json(test_predict_path)  # 对测试集的问题进行类别预测
     x_data = [' '.join(item['question']) for item in json_lst]
-    y_data = lr.main(tf_idf_vec.transform(x_data))
+    y_data = lr.predict(tf_idf_vec.transform(x_data))
     for item, label in zip(json_lst, y_data):
         item['label'] = label
     write_json(test_label_path, json_lst)
@@ -66,4 +77,5 @@ def main():
 
 
 if __name__ == '__main__':
+    # get_train_labels()
     main()

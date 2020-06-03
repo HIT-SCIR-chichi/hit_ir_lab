@@ -1,11 +1,12 @@
 """
 基于规则方法实现答案句抽取.
 """
+from util import read_json, pos_tag, write_json, test_answer_path, seg_line
 from answer_sentence_selection import test_ans_path as test_select_path
-from util import read_json, pos_tag, write_json, test_answer_path, train_path
+from data.metric import bleu1, exact_match
 import re
 
-test_span_path = './answer_span_selection/test_predict.json'
+test_span_path = './answer_span_selection/test_predict.json'  # 处理分号后的答案
 
 
 def _get_hum_ans(query_lst, ans_lst):
@@ -63,15 +64,19 @@ def _get_time_ans(query_lst: list, query_type, ans_lst: list):  # query_type：�
 
 def get_ans(query_lst: list, query_type: str, ans_lst: list) -> str:
     if query_type.startswith('HUM'):
-        return _get_hum_ans(query_lst, ans_lst)
+        res = _get_hum_ans(query_lst, ans_lst)
     elif query_type.startswith('LOC'):
-        return _get_loc_ans(query_lst, ans_lst)
+        res = _get_loc_ans(query_lst, ans_lst)
     elif query_type.startswith('NUM'):
-        return _get_num_ans(query_lst, ans_lst)
+        res = _get_num_ans(query_lst, ans_lst)
     elif query_type.startswith('TIME'):
-        return _get_time_ans(query_lst, query_type, ans_lst)
+        res = _get_time_ans(query_lst, query_type, ans_lst)
     else:
-        return ''.join(ans_lst)
+        res = ''.join(ans_lst)
+    for char in [':', '：']:
+        if char in res:
+            res = res.split(char)[1]
+    return res
 
 
 def predict():
@@ -85,11 +90,25 @@ def predict():
 
 
 def evaluate():
-    res_lst = read_json(train_path)
-    pass
+    res_lst, bleu_val, predict_lst, truth_lst = read_json('./temp.json'), 0, [], []
+    for item in res_lst:
+        ans_lst, truth_val = seg_line(item['answer_sentence'][0]), item['answer']
+        predict_val = get_ans(item['question'], item['label'], ans_lst)
+        bleu = bleu1(predict_val, truth_val)
+        bleu_val += bleu
+        predict_lst.append(predict_val)
+        truth_lst.append(truth_val)
+    return bleu_val / len(res_lst), exact_match(predict_lst, truth_lst)
 
 
-if __name__ == '__main__':
+def main():
+    print('*' * 100 + '\n正在对训练集进行答案抽取...')
+    bleu_val, exact_val = evaluate()
+    print('训练集上平均bleu值为{}\t精确匹配的准确率为{}'.format(bleu_val, exact_val))
     print('*' * 100 + '\n正在对测试集进行答案抽取...')
     predict()
     print('答案抽取完成...\n' + '*' * 100)
+
+
+if __name__ == '__main__':
+    main()

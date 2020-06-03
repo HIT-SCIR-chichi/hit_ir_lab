@@ -63,6 +63,7 @@ def get_features(q_words: list, ans_words: list, tf_idf_vec):  # q_words为查�
     vectors = tf_idf_vec.transform([' '.join(q_words), ' '.join(ans_words)]).toarray()
     norm_val = (norm(vectors[0]) * norm(vectors[1]))
     res.append('8:%f' % ((dot(vectors[0], vectors[1]) / norm_val) if norm_val else 0))  # tf-idf相似度
+    # res.append('9:%d' % (1 if ':' in ans_words or '：' in ans_words else 0))  # 句子中是否包含中文或英文冒号
     return res
 
 

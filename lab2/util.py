@@ -7,6 +7,7 @@ passages_path, seg_passages_path = './data/passages_multi_sentences.json', './da
 train_question_path, test_question_path = './data/train_questions.txt', './data/test_questions.txt'
 cws_path, pos_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model', 'E:/pyltp/ltp_data_v3.4.0/pos.model'
 test_answer_path = './data/test_answer.json'
+stop_words_path = './data/stopwords.txt'
 seg, postagger = None, None
 
 
@@ -59,3 +60,11 @@ def load_seg_passages():  # 加载分词后的passages
             seg_passages[item['pid']] = [seg_line(line.replace(' ', '')) for line in item['document']]
         dump(seg_passages_path, seg_passages)  # 将分词后的文本集导出到文件中
     return seg_passages
+
+
+def read_stop_words():
+    with open(stop_words_path, 'r', encoding='utf-8') as f:
+        stop_words = set()
+        for line in f:
+            stop_words.add(line.strip())
+        return stop_words
