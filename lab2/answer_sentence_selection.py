@@ -151,7 +151,7 @@ def load_model(update=False):
         exe_rank_svm()
         print('预测完成\n' + '*' * 100)
         right_predict, num = evaluate()
-        print('验证集正确答案数目：{}；总数：{}；正确率：{}'.format(right_predict, num, right_predict / num))
+        print('验证集正确答案数目：{}；总数：{}；准确率：{}%'.format(right_predict, num, (right_predict / num) * 100))
 
 
 def predict(num=1):  # num表示抽取的答案句数目
