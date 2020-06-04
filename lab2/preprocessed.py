@@ -84,12 +84,15 @@ def calc_vsm_perform(similarity_func=calc_inner_product):
 
     print('正在计算相似度...')
     res = {}
-    for question in res_lst:
-        query_dic, pid = {word: idf.get(word, 0) for word in question['question']}, question['pid']
+    for item in res_lst:
+        q_words, pid = {}, item['pid']
+        for word in item['question']:
+            q_words[word] = q_words.get(word, 0) + 1
+        query_dic = {word: idf.get(word, 0) * (1 + log(tf, 10)) for word, tf in q_words.items()}
         pred_pid = similarity_func(query_dic)[0][0]
-        res[question['qid']] = int(pred_pid) == pid
-        # print('进度: %.2f%%' % (len(res) / len(res_lst) * 100))
-    return len(list(filter(lambda item: res[item], res))) / len(res)
+        res[item['qid']] = int(pred_pid) == pid
+        print('进度: %.2f%%' % (len(res) / len(res_lst) * 100))
+    return len(list(filter(lambda val: res[val], res))) / len(res)
 
 
 def predict(similarity_func=calc_inner_product):  # 对测试集进行预测，要求在此函数前必须执行了vsm_init()函数.

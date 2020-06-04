@@ -2,7 +2,7 @@ from pyltp import Segmentor, Postagger
 from os.path import exists
 import json
 
-train_path, test_path = './data/train.json', './data/test.json'
+train_path, test_path = './data/train.json', './data/new_test.json'
 passages_path, seg_passages_path = './data/passages_multi_sentences.json', './data/seg_passages.json'
 train_question_path, test_question_path = './data/train_questions.txt', './data/test_questions.txt'
 cws_path, pos_path = 'E:/pyltp/ltp_data_v3.4.0/cws.model', 'E:/pyltp/ltp_data_v3.4.0/pos.model'

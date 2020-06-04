@@ -3,6 +3,7 @@
 """
 from util import read_json, pos_tag, write_json, test_answer_path, seg_line
 from answer_sentence_selection import test_ans_path as test_select_path
+from question_classification import get_train_labels
 from data.metric import bleu1, exact_match
 import re
 
@@ -90,7 +91,7 @@ def predict():
 
 
 def evaluate():
-    res_lst, bleu_val, predict_lst, truth_lst = read_json('./temp.json'), 0, [], []
+    res_lst, bleu_val, predict_lst, truth_lst = get_train_labels(), 0, [], []
     for item in res_lst:
         ans_lst, truth_val = seg_line(item['answer_sentence'][0]), item['answer']
         predict_val = get_ans(item['question'], item['label'], ans_lst)

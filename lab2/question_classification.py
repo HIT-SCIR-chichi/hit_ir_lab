@@ -55,7 +55,7 @@ def get_train_labels():  # 将train.json文件中的所有问题分类
     y_data = lr.predict(tf_idf_vec.transform(x_data))
     for item, label in zip(res_lst, y_data):
         item['label'] = label
-    write_json('./temp.json', res_lst)
+    return res_lst
 
 
 def main():
@@ -77,5 +77,4 @@ def main():
 
 
 if __name__ == '__main__':
-    # get_train_labels()
     main()
