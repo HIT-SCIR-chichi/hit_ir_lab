@@ -17,6 +17,7 @@ from os.path import exists
 from math import log
 import sys
 
+level_dic = {idx: int(idx / 250) + 1 for idx in range(1000)}  # 0-249等级1才可以访问，250—499等级1、2可访问，500-749等级1、2、3可访问
 bm25_model_path, bm25_file_model = './retrieval_system/bm25', './retrieval_system/bm25_file'
 bm25_img_model, cws_path = './retrieval_system/bm25_img', 'E:/pyltp/ltp_data_v3.4.0/cws.model'
 passages_path, img_path = './data/seg_res.json', './data/img/'
@@ -130,10 +131,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QMessageBox.information(self, '无图片', '当前网页无插图')
 
     def get_search_res(self):  # 点击搜索按钮的绑定动作
-        bm25, num = self.bm25 if self.cb_type.isChecked() else self.bm25_file, int(self.sb_num.text())  # num为搜索数目
+        bm25, num, = self.bm25 if self.cb_type.isChecked() else self.bm25_file, int(self.sb_num.text())
         rsv_lst = bm25.calc_score(seg_line(self.et_query.text()))
-        rsv_lst = sorted([(idx, val) for idx, val in enumerate(rsv_lst)], key=lambda item: item[1], reverse=True)[:num]
-        res_passages = [passages[item[0]] for item in rsv_lst]  # 获取所有的篇章结构，形式等同于seg_res文件中的格式
+        rsv_lst = sorted([(idx, val) for idx, val in enumerate(rsv_lst)], key=lambda item: item[1], reverse=True)
+        level, res_passages = self.cb_level.currentIndex() + 1, []  # 当前的等级
+        for tuple_item in rsv_lst:  # 获取所有的篇章结构，形式等同于seg_res文件中的格式，同时满足权限要求
+            if level <= level_dic[tuple_item[0]]:
+                res_passages.append(passages[tuple_item[0]])
+            if len(res_passages) == num:
+                break
         self.__set_search_res(res_passages)
 
     def get_search_type(self):  # 点击搜索类型的绑定动作
@@ -141,6 +147,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cb_type.setText('搜索附件')
         else:
             self.cb_type.setText('搜索新闻')
+
+
+def is_authorized(level: int, doc_num):  # level标识用户等级，越小等级越高；doc_num标识目前文档编号
+    return level <= level_dic[doc_num]
 
 
 def seg_line(line: str) -> list:
