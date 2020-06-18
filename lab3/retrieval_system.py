@@ -4,14 +4,15 @@
 检索附件的系统：docs输入为所有的标题，返回最相关的文档；
 检索照片的系统：docs输入为所有照片的文件名，构建对应的VSM模型
 若检索对象为照片附件，则采取的操作是：采用检索附件的系统获取最相关的文档，随后采用检索照片的系统获取该文档中重要性最高的照片，并展示。
+
+关于分权限访问
+设置四个权限等级：1、2、3、4，其中值越小，代表权限越高；
+按照爬取文档在json文件中的序号进行划分权限，每250个为一个权限等级。
 """
-from PyQt5.QtWidgets import QMainWindow, QApplication, QListWidgetItem, QLabel, QWidget, QVBoxLayout, QDialog, \
-    QMessageBox
-from PyQt5.QtGui import QFont, QPixmap
+from PyQt5 import QtGui, QtCore, QtWidgets
 from json import load, dump, loads
 from search import Ui_MainWindow
 from show_img import Ui_Dialog
-from PyQt5.QtCore import QSize, Qt
 from pyltp import Segmentor
 from os.path import exists
 from math import log
@@ -68,40 +69,36 @@ class BM25:
                   'param': self.param}, f, ensure_ascii=False)
 
 
-class MainWindow(QMainWindow, Ui_MainWindow):
-    class CustomQListWidgetItem(QListWidgetItem):
+class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
+    class CustomQListWidgetItem(QtWidgets.QListWidgetItem):
         def __init__(self, title, passage, url, file_lst):
             super().__init__()
-            self.widget = QWidget()
-            self.passage = QLabel(text=passage)
-            self.title = QLabel(text='<a href="{}">{} <a/>'.format(url, title))
+            self.widget = QtWidgets.QWidget()
+            self.passage = QtWidgets.QLabel(text=passage)
+            self.title = QtWidgets.QLabel(text='<a href="{}">{} <a/>'.format(url, title))
             self.file_lst = file_lst
 
-            self.setSizeHint(QSize(100, 90))
-            self.__set_widget()
-
-        def __set_widget(self):
-            self.title.setFont(QFont("Microsoft YaHei", pointSize=10, weight=50))
+            self.setSizeHint(QtCore.QSize(100, 90))
+            self.title.setFont(QtGui.QFont("Microsoft YaHei", pointSize=10, weight=50))
             self.title.setOpenExternalLinks(True)  # 可打开外部链接
             self.passage.setWordWrap(True)  # 自动换行
 
-            v_layout = QVBoxLayout()
+            v_layout = QtWidgets.QVBoxLayout()
             v_layout.addWidget(self.title)
             v_layout.addWidget(self.passage)
             self.widget.setLayout(v_layout)
 
-    class ImgDialog(QDialog, Ui_Dialog):
+    class ImgDialog(QtWidgets.QDialog, Ui_Dialog):
         def __init__(self, path):
             super().__init__()
             self.setupUi(self)
-            self.label_img.setPixmap(QPixmap(path))
-            self.setWindowFlags(Qt.WindowCloseButtonHint | Qt.WindowMinMaxButtonsHint)  # 设置弹窗右上角按钮
+            self.label_img.setPixmap(QtGui.QPixmap(path))
+            self.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinMaxButtonsHint)  # 设置弹窗右上角按钮
 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
         self.img_dialog = None
-
         self.bm25 = get_bm25(bm25_model_path, [item['segmented_paragraphs'] for item in passages])  # BM25模型实例
         self.bm25_file = get_bm25(bm25_file_model, [item['segmented_title'] for item in passages])  # 检索附件的模型
         self.bm25_img = get_bm25(bm25_img_model, [item['file_name'] for item in passages])  # 照片重要度
@@ -124,11 +121,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             img_dic[path] = img_dic.get(path, 0) + 1
         img_dic = {path: val * self.bm25_img.idf[path] for path, val in img_dic.items()}
         res_lst = sorted(img_dic, key=lambda key: img_dic[key], reverse=True)  # 照片按照重要性排序
-        if res_lst:
+        if res_lst and exists(img_path + res_lst[0]):
             self.img_dialog = self.ImgDialog(img_path + res_lst[0])
             self.img_dialog.show()
         else:
-            QMessageBox.information(self, '无图片', '当前网页无插图')
+            QtWidgets.QMessageBox.information(self, '无图片', '当前网页无插图或本地无相关图片')
 
     def get_search_res(self):  # 点击搜索按钮的绑定动作
         bm25, num, = self.bm25 if self.cb_type.isChecked() else self.bm25_file, int(self.sb_num.text())
@@ -147,10 +144,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.cb_type.setText('搜索附件')
         else:
             self.cb_type.setText('搜索新闻')
-
-
-def is_authorized(level: int, doc_num):  # level标识用户等级，越小等级越高；doc_num标识目前文档编号
-    return level <= level_dic[doc_num]
 
 
 def seg_line(line: str) -> list:
@@ -175,7 +168,7 @@ if __name__ == '__main__':
     with open(passages_path, 'r', encoding='utf-8') as passages_f:
         passages = [loads(json_line) for json_line in passages_f]  # 读取爬取的所有文章
 
-        app = QApplication(sys.argv)
+        app = QtWidgets.QApplication(sys.argv)
         main_win = MainWindow()
         main_win.show()
         sys.exit(app.exec_())
