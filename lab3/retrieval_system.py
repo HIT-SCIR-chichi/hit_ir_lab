@@ -1,18 +1,25 @@
 """
 使用自己构建的BM25模型进行检索系统的构建.
+检索网页正文的系统：docs输入为所有的网页正文；
+检索附件的系统：docs输入为所有的标题，返回最相关的文档；
+检索照片的系统：docs输入为所有照片的文件名，构建对应的VSM模型
+若检索对象为照片附件，则采取的操作是：采用检索附件的系统获取最相关的文档，随后采用检索照片的系统获取该文档中重要性最高的照片，并展示。
 """
-from PyQt5.QtWidgets import QMainWindow, QApplication, QListWidgetItem, QLabel, QWidget, QVBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QApplication, QListWidgetItem, QLabel, QWidget, QVBoxLayout, QDialog, \
+    QMessageBox
+from PyQt5.QtGui import QFont, QPixmap
 from json import load, dump, loads
 from search import Ui_MainWindow
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QFont
+from show_img import Ui_Dialog
+from PyQt5.QtCore import QSize, Qt
 from pyltp import Segmentor
 from os.path import exists
 from math import log
 import sys
 
-bm25_model_path, cws_path = './retrieval_system/bm25', 'E:/pyltp/ltp_data_v3.4.0/cws.model'
-passages_path = './data/seg_res.json'
+bm25_model_path, bm25_file_model = './retrieval_system/bm25', './retrieval_system/bm25_file'
+bm25_img_model, cws_path = './retrieval_system/bm25_img', 'E:/pyltp/ltp_data_v3.4.0/cws.model'
+passages_path, img_path = './data/seg_res.json', './data/img/'
 seg, passages = None, []
 
 
@@ -62,11 +69,12 @@ class BM25:
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     class CustomQListWidgetItem(QListWidgetItem):
-        def __init__(self, title, passage, url):
+        def __init__(self, title, passage, url, file_lst):
             super().__init__()
             self.widget = QWidget()
             self.passage = QLabel(text=passage)
             self.title = QLabel(text='<a href="{}">{} <a/>'.format(url, title))
+            self.file_lst = file_lst
 
             self.setSizeHint(QSize(100, 90))
             self.__set_widget()
@@ -76,52 +84,63 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.title.setOpenExternalLinks(True)  # 可打开外部链接
             self.passage.setWordWrap(True)  # 自动换行
 
-            layout = QVBoxLayout()
-            layout.addWidget(self.title)
-            layout.addWidget(self.passage)
-            self.widget.setLayout(layout)
+            v_layout = QVBoxLayout()
+            v_layout.addWidget(self.title)
+            v_layout.addWidget(self.passage)
+            self.widget.setLayout(v_layout)
+
+    class ImgDialog(QDialog, Ui_Dialog):
+        def __init__(self, path):
+            super().__init__()
+            self.setupUi(self)
+            self.label_img.setPixmap(QPixmap(path))
+            self.setWindowFlags(Qt.WindowCloseButtonHint | Qt.WindowMinMaxButtonsHint)  # 设置弹窗右上角按钮
 
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.bm25 = None  # BM25模型实例
+        self.img_dialog = None
 
-        self.__get_bm25()  # 初始化BM25模型
-        self.__set_search_res(passages[:10])
+        self.bm25 = get_bm25(bm25_model_path, [item['segmented_paragraphs'] for item in passages])  # BM25模型实例
+        self.bm25_file = get_bm25(bm25_file_model, [item['segmented_title'] for item in passages])  # 检索附件的模型
+        self.bm25_img = get_bm25(bm25_img_model, [item['file_name'] for item in passages])  # 照片重要度
 
-    def __get_bm25(self):
-        self.bm25 = BM25()
-        if exists(bm25_model_path):
-            self.bm25.load(bm25_model_path)
-        else:
-            docs = [item['segmented_paragraphs'] for item in read_json(passages_path)]
-            self.bm25.fit(docs)
-            self.bm25.dump(bm25_model_path)
+        self.__set_search_res(passages[:int(self.sb_num.text())])  # 默认加载一定数目的新闻
 
     def __set_search_res(self, res_passages):
         self.lw_res.clear()  # 清除所有项
+        self.lw_res.itemClicked.connect(self.__passage_click)  # 单击listWidgetItem的动作
         for item in res_passages:
             url, title_words, passage_words, file_lst = item['url'], item['segmented_title'], item[
                 'segmented_paragraphs'], item['file_name']
-            item = self.CustomQListWidgetItem(''.join(title_words), ''.join(passage_words), url)
+            item = self.CustomQListWidgetItem(''.join(title_words), ''.join(passage_words), url, file_lst)
             self.lw_res.addItem(item)
             self.lw_res.setItemWidget(item, item.widget)
 
-    def get_search_res(self):
-        num = 10
-        res_passages = get_res(self.et_query.text(), self.bm25, num=num)  # 获取查询的结果
+    def __passage_click(self, item: CustomQListWidgetItem):  # 点击一篇passage后的操作
+        img_dic = {}  # 根据VSM的思想计算该网络文本中的附件的重要程度
+        for path in item.file_lst:
+            img_dic[path] = img_dic.get(path, 0) + 1
+        img_dic = {path: val * self.bm25_img.idf[path] for path, val in img_dic.items()}
+        res_lst = sorted(img_dic, key=lambda key: img_dic[key], reverse=True)  # 照片按照重要性排序
+        if res_lst:
+            self.img_dialog = self.ImgDialog(img_path + res_lst[0])
+            self.img_dialog.show()
+        else:
+            QMessageBox.information(self, '无图片', '当前网页无插图')
+
+    def get_search_res(self):  # 点击搜索按钮的绑定动作
+        bm25, num = self.bm25 if self.cb_type.isChecked() else self.bm25_file, int(self.sb_num.text())  # num为搜索数目
+        rsv_lst = bm25.calc_score(seg_line(self.et_query.text()))
+        rsv_lst = sorted([(idx, val) for idx, val in enumerate(rsv_lst)], key=lambda item: item[1], reverse=True)[:num]
+        res_passages = [passages[item[0]] for item in rsv_lst]  # 获取所有的篇章结构，形式等同于seg_res文件中的格式
         self.__set_search_res(res_passages)
 
-    def get_search_type(self):
+    def get_search_type(self):  # 点击搜索类型的绑定动作
         if not self.cb_type.isChecked():
             self.cb_type.setText('搜索附件')
         else:
             self.cb_type.setText('搜索新闻')
-
-
-def read_json(json_path):  # 读取json文件，要求每一行都是标准的json格式文件，返回：list[python对象]
-    with open(json_path, 'r', encoding='utf-8') as f:
-        return [loads(json_line) for json_line in f]
 
 
 def seg_line(line: str) -> list:
@@ -132,16 +151,21 @@ def seg_line(line: str) -> list:
     return list(seg.segment(line))
 
 
-def get_res(query, bm25: BM25, num=10):  # num表示获取最相关的文章数目，返回值为[]*num，元素为{'url':url,segmented_title:''...}
-    rsv_lst = bm25.calc_score(seg_line(query))
-    rsv_lst = sorted([(idx, val) for idx, val in enumerate(rsv_lst)], key=lambda item: item[1], reverse=True)[:num]
-    return [passages[item[0]] for item in rsv_lst]
+def get_bm25(model_path, docs):  # 构造器，返回model_path对应的模型实例
+    bm25 = BM25()
+    if exists(model_path):
+        bm25.load(model_path)
+    else:
+        bm25.fit(docs)
+        bm25.dump(model_path)
+    return bm25
 
 
 if __name__ == '__main__':
-    passages = read_json(passages_path)  # 读取爬取的所有文章
+    with open(passages_path, 'r', encoding='utf-8') as passages_f:
+        passages = [loads(json_line) for json_line in passages_f]  # 读取爬取的所有文章
 
-    app = QApplication(sys.argv)
-    main_win = MainWindow()
-    main_win.show()
-    sys.exit(app.exec_())
+        app = QApplication(sys.argv)
+        main_win = MainWindow()
+        main_win.show()
+        sys.exit(app.exec_())
